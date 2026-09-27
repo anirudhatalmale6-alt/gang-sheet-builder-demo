@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gang Sheet Builder — demo</title>
+<style>
+  :root{
+    --ink:#14161a; --ink-2:#2a2f37; --muted:#6b7280; --line:#e2e5ea;
+    --bg:#f4f5f7; --panel:#ffffff; --accent:#d4622a; --accent-2:#1f7a8c;
+    --ok:#2f7d4f; --warn:#b8860b; --bad:#c0392b;
+    --shadow:0 1px 2px rgba(20,22,26,.06),0 8px 24px rgba(20,22,26,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select{font:inherit;color:inherit}
+  .app{display:flex;flex-direction:column;height:100vh;min-height:0}
+
+  /* ---------- header ---------- */
+  header{
+    background:var(--ink); color:#fff; padding:10px 18px;
+    display:flex;align-items:center;gap:16px;flex:none;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand b{font-size:16px;letter-spacing:.2px}
+  .brand span{font-size:12px;color:#9aa3af}
+  .tag{
+    margin-left:auto;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+    color:#9aa3af;border:1px solid #333941;border-radius:99px;padding:4px 10px;
+  }
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    background:var(--panel);border-bottom:1px solid var(--line);
+    padding:10px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none;
+  }
+  .btn{
+    background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 12px;
+    cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+    transition:border-color .12s,background .12s,transform .04s;
+  }
+  .btn:hover{border-color:#c2c8d0;background:#fbfbfc}
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btn.primary:hover{background:#c2551f;border-color:#c2551f}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{background:#f0f1f3;color:var(--ink)}
+  .sep{width:1px;height:26px;background:var(--line);margin:0 4px}
+  .field{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
+  select,input[type=number],input[type=text]{
+    border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:#fff;
+  }
+  input[type=number]{width:78px}
+
+  /* ---------- layout ---------- */
+  .main{display:flex;flex:1;min-height:0}
+  .stage{
+    flex:1;min-width:0;overflow:auto;padding:28px;position:relative;
+    background:
+      linear-gradient(#eceef1 1px,transparent 1px) 0 0/22px 22px,
+      linear-gradient(90deg,#eceef1 1px,transparent 1px) 0 0/22px 22px,
+      var(--bg);
+  }
+  .sheet-wrap{margin:0 auto;width:max-content;position:relative}
+  .ruler-top,.ruler-left{position:absolute;color:#98a0ab;font-size:10px;user-select:none}
+  .ruler-top{top:-20px;left:0;height:18px}
+  .ruler-left{left:-26px;top:0;width:22px}
+  .tick{position:absolute;display:flex;align-items:center;justify-content:center}
+  .tick.v{width:22px;justify-content:flex-end;padding-right:4px}
+
+  .sheet{
+    position:relative;background:#fff;border:1px solid #cfd4db;box-shadow:var(--shadow);
+    background-image:
+      linear-gradient(45deg,#f6f7f8 25%,transparent 25%,transparent 75%,#f6f7f8 75%),
+      linear-gradient(45deg,#f6f7f8 25%,transparent 25%,transparent 75%,#f6f7f8 75%);
+    background-size:16px 16px;background-position:0 0,8px 8px;
+    touch-action:none;
+  }
+  .safe{position:absolute;inset:0;border:1px dashed #c8ccd3;pointer-events:none;z-index:2}
+
+  .item{position:absolute;cursor:grab;z-index:3}
+  .item img{width:100%;height:100%;display:block;pointer-events:none;-webkit-user-drag:none}
+  .item .frame{position:absolute;inset:-1px;border:1px solid transparent;pointer-events:none}
+  .item.sel{z-index:6}
+  .item.sel .frame{border-color:var(--accent-2);box-shadow:0 0 0 1px rgba(31,122,140,.25)}
+  .item.bad .frame{border-color:var(--bad);border-style:dashed;background:rgba(192,57,43,.09)}
+  .item .h{
+    position:absolute;width:11px;height:11px;background:#fff;border:1.5px solid var(--accent-2);
+    border-radius:2px;display:none;
+  }
+  .item.sel .h{display:block}
+  .h.nw{left:-6px;top:-6px;cursor:nwse-resize}
+  .h.ne{right:-6px;top:-6px;cursor:nesw-resize}
+  .h.sw{left:-6px;bottom:-6px;cursor:nesw-resize}
+  .h.se{right:-6px;bottom:-6px;cursor:nwse-resize}
+  .h.rot{
+    left:50%;top:-30px;margin-left:-6px;border-radius:50%;cursor:grab;
+    border-color:var(--accent);
+  }
+  .item.sel .stem{
+    display:block;position:absolute;left:50%;top:-24px;width:1px;height:24px;
+    background:var(--accent);
+  }
+  .stem{display:none}
+  .badge{
+    position:absolute;left:0;top:-19px;font-size:10px;line-height:1;padding:3px 5px;
+    background:var(--accent-2);color:#fff;border-radius:3px;white-space:nowrap;display:none;
+  }
+  .item.sel .badge{display:block}
+  .item.bad .badge{background:var(--bad)}
+
+  /* ---------- side panel ---------- */
+  aside{
+    width:310px;flex:none;background:var(--panel);border-left:1px solid var(--line);
+    overflow:auto;display:flex;flex-direction:column;
+  }
+  .sec{padding:16px 18px;border-bottom:1px solid var(--line)}
+  .sec h3{
+    margin:0 0 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    font-weight:700;
+  }
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+  .row:last-child{margin-bottom:0}
+  .row label{color:var(--muted);font-size:13px}
+  .dual{display:flex;gap:8px;align-items:center}
+  .dual input{width:100%}
+  .link{background:none;border:0;color:var(--accent-2);cursor:pointer;padding:0;font-size:12px;text-decoration:underline}
+  .empty{color:var(--muted);font-size:13px;font-style:italic}
+
+  .price{font-size:30px;font-weight:700;letter-spacing:-.5px}
+  .price small{font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0}
+  .meter{height:7px;border-radius:99px;background:#eceef1;overflow:hidden;margin:6px 0 4px}
+  .meter i{display:block;height:100%;background:var(--accent-2);transition:width .18s}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+  .flag{
+    display:flex;gap:8px;align-items:flex-start;font-size:12px;border-radius:8px;padding:9px 10px;
+    margin-top:10px;line-height:1.45;
+  }
+  .flag.ok{background:#eef6f1;color:#2b6b47}
+  .flag.warn{background:#fdf5e3;color:#8a6414}
+  .flag.bad{background:#fbeceb;color:#a3312a}
+  .flag b{display:block}
+  .thumbs{display:flex;flex-wrap:wrap;gap:7px}
+  .thumb{
+    width:62px;height:46px;border:1px solid var(--line);border-radius:7px;background:#fff;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:4px;
+  }
+  .thumb:hover{border-color:var(--accent)}
+  .thumb img{max-width:100%;max-height:100%}
+  footer.bar{
+    margin-top:auto;padding:14px 18px;border-top:1px solid var(--line);background:#fafbfc;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .hint{font-size:11.5px;color:var(--muted);text-align:center}
+  .drop{
+    position:absolute;inset:0;background:rgba(212,98,42,.08);border:2px dashed var(--accent);
+    display:none;align-items:center;justify-content:center;font-weight:600;color:var(--accent);
+    z-index:20;pointer-events:none;
+  }
+  .drop.on{display:flex}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><b>Gang Sheet Builder</b><span>22&quot; roll · DTF transfers</span></div>
+    <div class="tag">Working demo</div>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn primary" id="btnUpload">＋ Upload artwork</button>
+    <input type="file" id="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+    <button class="btn" id="btnSamples">Load sample designs</button>
+    <div class="sep"></div>
+    <button class="btn" id="btnNest">⇄ Auto-nest</button>
+    <button class="btn" id="btnFit">Fit sheet to art</button>
+    <div class="sep"></div>
+    <div class="field">
+      <label for="len">Sheet</label>
+      <select id="len"></select>
+    </div>
+    <div class="sep"></div>
+    <button class="btn ghost" id="btnZoomOut">−</button>
+    <span class="field" id="zoomLbl" style="min-width:44px;justify-content:center">100%</span>
+    <button class="btn ghost" id="btnZoomIn">＋</button>
+    <div class="sep"></div>
+    <button class="btn ghost" id="btnClear">Clear sheet</button>
+  </div>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <div class="drop" id="drop">Drop PNG files to add them to the sheet</div>
+      <div class="sheet-wrap" id="wrap">
+        <div class="ruler-top" id="rulerTop"></div>
+        <div class="ruler-left" id="rulerLeft"></div>
+        <div class="sheet" id="sheet"><div class="safe" id="safe"></div></div>
+      </div>
+    </div>
+
+    <aside>
+      <div class="sec">
+        <h3>Selected design</h3>
+        <div id="props"><p class="empty">Nothing selected. Click a design on the sheet.</p></div>
+      </div>
+
+      <div class="sec">
+        <h3>Sheet usage</h3>
+        <div class="row" style="align-items:flex-end">
+          <div>
+            <div class="price" id="price">$0.00</div>
+            <small style="color:var(--muted)" id="sheetLbl">22&quot; × 12&quot;</small>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:600" id="count">0 designs</div>
+            <small style="color:var(--muted)" id="area">0% used</small>
+          </div>
+        </div>
+        <div class="meter"><i id="bar" style="width:0%"></i></div>
+        <div id="flags"></div>
+      </div>
+
+      <div class="sec">
+        <h3>Quick add</h3>
+        <div class="thumbs" id="thumbs"></div>
+        <p class="note">Click a thumbnail to drop another copy on the sheet. Real store would pull these from the customer's saved uploads.</p>
+      </div>
+
+      <footer class="bar">
+        <button class="btn primary" id="btnCart">Add to cart — <span id="cartPrice">$0.00</span></button>
+        <div style="display:flex;gap:8px">
+          <button class="btn" style="flex:1" id="btnProof">Download proof</button>
+          <button class="btn" style="flex:1" id="btnJson">Export layout</button>
+        </div>
+        <div class="hint">Drag to move · corner handles resize · ⌫ deletes · arrows nudge</div>
+      </footer>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   Gang Sheet Builder — demo build
+   Units: everything is stored in INCHES. Screen pixels = inches * SCALE * zoom.
+   ------------------------------------------------------------------ */
+
+const SHEET_W   = 22;      // roll width, inches
+const MARGIN    = 0.25;    // safe margin, inches
+const GUTTER    = 0.125;   // spacing between designs when nesting, inches
+const BASE_DPI  = 300;     // assumed artwork DPI when sizing an upload
+const MIN_DPI   = 150;     // below this we warn the customer
+const PROOF_DPI = 100;     // proof export resolution (production render is 300 server-side)
+
+// Length tiers -> price. Same shape a real shop plugs their own pricing into.
+const TIERS = [
+  {in:12,  price: 9.50},
+  {in:24,  price:17.00},
+  {in:36,  price:24.00},
+  {in:48,  price:30.00},
+  {in:60,  price:36.00},
+  {in:120, price:68.00},
+];
+
+const SAMPLES = [
+  'samples/mama-bear.png','samples/friday-night-lights.png','samples/blessed.png',
+  'samples/pocket-badge.png','samples/sleeve-strip.png','samples/game-day.png',
+  'samples/name-decal.png',
+];
+
+const state = {
+  items: [],          // {id,src,img,x,y,w,h,rot,natW,natH,el}
+  tier: TIERS[1],
+  zoom: 1,
+  selId: null,
+  nextId: 1,
+};
+
+const $ = s => document.querySelector(s);
+const sheetEl = $('#sheet'), stageEl = $('#stage');
+let SCALE = 30;                      // px per inch at zoom 1 (recomputed on resize)
+const px = inches => inches * SCALE * state.zoom;
+
+/* ---------------- sheet + rulers ---------------- */
+
+function computeScale(){
+  const avail = stageEl.clientWidth - 56 - 34;      // padding + left ruler
+  SCALE = Math.max(14, Math.min(46, avail / SHEET_W));
+}
+
+function drawRulers(){
+  const top = $('#rulerTop'), left = $('#rulerLeft');
+  top.style.width = px(SHEET_W)+'px';
+  top.innerHTML = '';
+  const stepX = px(1) < 24 ? 2 : 1;
+  for(let i=0;i<=SHEET_W;i+=stepX){
+    const t=document.createElement('div');
+    t.className='tick'; t.style.left=(px(i)-12)+'px'; t.style.width='24px';
+    t.style.top='0'; t.textContent=i+'"';
+    top.appendChild(t);
+  }
+  left.style.height = px(state.tier.in)+'px';
+  left.innerHTML='';
+  const stepY = px(1) < 24 ? (px(1) < 12 ? 6 : 2) : 1;
+  for(let i=0;i<=state.tier.in;i+=stepY){
+    const t=document.createElement('div');
+    t.className='tick v'; t.style.top=(px(i)-7)+'px'; t.style.height='14px';
+    t.style.left='0'; t.textContent=i+'"';
+    left.appendChild(t);
+  }
+}
+
+function layoutSheet(){
+  sheetEl.style.width  = px(SHEET_W)+'px';
+  sheetEl.style.height = px(state.tier.in)+'px';
+  $('#safe').style.inset = px(MARGIN)+'px';
+  drawRulers();
+  state.items.forEach(place);
+  $('#zoomLbl').textContent = Math.round(state.zoom*100)+'%';
+}
+
+/* ---------------- geometry ---------------- */
+
+// Axis-aligned bounding box of a rotated item, in inches.
+function aabb(it){
+  const r = it.rot * Math.PI/180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r));
+  const w = it.w*c + it.h*s, h = it.w*s + it.h*c;
+  const cx = it.x + it.w/2, cy = it.y + it.h/2;
+  return {x:cx-w/2, y:cy-h/2, w, h};
+}
+
+function outOfBounds(it){
+  const b = aabb(it);
+  return b.x < MARGIN-1e-6 || b.y < MARGIN-1e-6 ||
+         b.x+b.w > SHEET_W-MARGIN+1e-6 || b.y+b.h > state.tier.in-MARGIN+1e-6;
+}
+
+function overlaps(a,b){
+  const A=aabb(a), B=aabb(b);
+  return A.x < B.x+B.w && B.x < A.x+A.w && A.y < B.y+B.h && B.y < A.y+A.h;
+}
+
+function effDpi(it){ return Math.round(it.natW / it.w); }
+
+/* ---------------- items ---------------- */
+
+function addImage(src, natW, natH, at){
+  // Size the artwork from its pixel dimensions at 300dpi, then cap so it fits the roll.
+  let w = natW/BASE_DPI, h = natH/BASE_DPI;
+  const maxW = SHEET_W - MARGIN*2;
+  if(w > maxW){ h *= maxW/w; w = maxW; }
+  const maxH = state.tier.in - MARGIN*2;
+  if(h > maxH){ w *= maxH/h; h = maxH; }
+
+  const it = {
+    id: state.nextId++, src, natW, natH, w, h, rot:0,
+    x: at ? at.x : MARGIN, y: at ? at.y : MARGIN, el:null,
+  };
+  if(!at) Object.assign(it, freeSpot(it));
+  state.items.push(it);
+  render(it);
+  select(it.id);
+  refresh();
+  return it;
+}
+
+// Find the first row-wise gap that fits this item — keeps uploads from stacking on each other.
+function freeSpot(it){
+  const b = {w:it.w, h:it.h};
+  for(let y=MARGIN; y+b.h <= state.tier.in-MARGIN+1e-6; y+=0.25){
+    for(let x=MARGIN; x+b.w <= SHEET_W-MARGIN+1e-6; x+=0.25){
+      const probe = {...it, x, y};
+      if(!state.items.some(o => o.id!==it.id && overlaps(probe,o))) return {x,y};
+    }
+  }
+  return {x:MARGIN, y:MARGIN};
+}
+
+function render(it){
+  const el = document.createElement('div');
+  el.className = 'item';
+  el.dataset.id = it.id;
+  el.innerHTML =
+    '<img src="'+it.src+'" alt="">' +
+    '<div class="frame"></div><div class="badge"></div><div class="stem"></div>' +
+    '<div class="h nw" data-h="nw"></div><div class="h ne" data-h="ne"></div>' +
+    '<div class="h sw" data-h="sw"></div><div class="h se" data-h="se"></div>' +
+    '<div class="h rot" data-h="rot"></div>';
+  sheetEl.appendChild(el);
+  it.el = el;
+  place(it);
+}
+
+function place(it){
+  const el = it.el; if(!el) return;
+  el.style.left   = px(it.x)+'px';
+  el.style.top    = px(it.y)+'px';
+  el.style.width  = px(it.w)+'px';
+  el.style.height = px(it.h)+'px';
+  el.style.transform = 'rotate('+it.rot+'deg)';
+  el.querySelector('.badge').textContent =
+    it.w.toFixed(2)+'" × '+it.h.toFixed(2)+'"' + (it.rot ? '  '+Math.round(it.rot)+'°' : '');
+}
+
+function select(id){
+  state.selId = id;
+  state.items.forEach(i => i.el.classList.toggle('sel', i.id===id));
+  drawProps();
+}
+
+function remove(id){
+  const i = state.items.findIndex(x=>x.id===id);
+  if(i<0) return;
+  state.items[i].el.remove();
+  state.items.splice(i,1);
+  if(state.selId===id) state.selId=null;
+  refresh(); drawProps();
+}
+
+function duplicate(id, times){
+  const src = state.items.find(x=>x.id===id); if(!src) return;
+  for(let n=0;n<times;n++){
+    const copy = {...src, id:state.nextId++, el:null};
+    Object.assign(copy, freeSpot(copy));
+    state.items.push(copy);
+    render(copy);
+  }
+  refresh();
+}
+
+/* ---------------- auto-nest (shelf packing) ---------------- */
+
+function autoNest(){
+  const items = [...state.items].sort((a,b)=> aabb(b).h - aabb(a).h);
+  let x = MARGIN, y = MARGIN, rowH = 0;
+  for(const it of items){
+    const b = aabb(it);
+    if(x + b.w > SHEET_W - MARGIN + 1e-6){          // new shelf
+      x = MARGIN; y += rowH + GUTTER; rowH = 0;
+    }
+    const cx = x + b.w/2, cy = y + b.h/2;
+    it.x = cx - it.w/2; it.y = cy - it.h/2;
+    place(it);
+    x += b.w + GUTTER;
+    rowH = Math.max(rowH, b.h);
+  }
+  refresh();
+}
+
+function usedLength(){
+  let max = 0;
+  for(const it of state.items){ const b=aabb(it); max = Math.max(max, b.y+b.h); }
+  return max ? max + MARGIN : 0;
+}
+
+function fitSheet(){
+  autoNest();
+  const need = usedLength();
+  const tier = TIERS.find(t => t.in >= need) || TIERS[TIERS.length-1];
+  setTier(tier.in);
+}
+
+function setTier(inches){
+  state.tier = TIERS.find(t=>t.in===+inches) || state.tier;
+  $('#len').value = state.tier.in;
+  // Pull anything that now hangs off the bottom back onto the sheet.
+  for(const it of state.items){
+    const b = aabb(it);
+    if(b.y + b.h > state.tier.in - MARGIN){
+      it.y -= (b.y + b.h) - (state.tier.in - MARGIN);
+      if(aabb(it).y < MARGIN) it.y += MARGIN - aabb(it).y;
+    }
+  }
+  layoutSheet(); refresh();
+}
+
+/* ---------------- pricing + status ---------------- */
+
+function refresh(){
+  const n = state.items.length;
+  $('#count').textContent = n + (n===1 ? ' design' : ' designs');
+  $('#price').textContent = '$'+state.tier.price.toFixed(2);
+  $('#cartPrice').textContent = '$'+state.tier.price.toFixed(2);
+  $('#sheetLbl').textContent = '22" × '+state.tier.in+'"';
+
+  // Utilisation that actually matters for price: how much of the sheet LENGTH is used.
+  const used = usedLength();
+  const pct = Math.min(100, Math.round(used/state.tier.in*100));
+  $('#area').textContent = used.toFixed(1)+'" of '+state.tier.in+'" used';
+  $('#bar').style.width = pct+'%';
+
+  // per-item validation
+  const clashing = new Set(), off = new Set(), lowres = [];
+  for(let i=0;i<state.items.length;i++){
+    const a = state.items[i];
+    if(outOfBounds(a)) off.add(a.id);
+    if(effDpi(a) < MIN_DPI) lowres.push(a);
+    for(let j=i+1;j<state.items.length;j++){
+      if(overlaps(a, state.items[j])){ clashing.add(a.id); clashing.add(state.items[j].id); }
+    }
+  }
+  state.items.forEach(it => it.el.classList.toggle('bad', clashing.has(it.id)||off.has(it.id)));
+
+  const flags = $('#flags'); flags.innerHTML = '';
+  const add = (cls,title,body)=>{
+    const d=document.createElement('div'); d.className='flag '+cls;
+    d.innerHTML='<div><b>'+title+'</b>'+body+'</div>'; flags.appendChild(d);
+  };
+  if(off.size)      add('bad',''+off.size+' design(s) off the sheet','Move them inside the dashed safe area or they will be trimmed.');
+  if(clashing.size) add('bad',''+clashing.size+' design(s) overlapping','Overlapping art cannot be cut apart after printing.');
+  if(lowres.length) add('warn',lowres.length+' low-resolution design(s)','Printing under '+MIN_DPI+' DPI — will look soft. Scale it down or send a bigger file.');
+  if(n && !off.size && !clashing.size && !lowres.length)
+    add('ok','Ready to print','All designs inside the safe area, no overlaps, resolution is good.');
+  if(n && pct < 50 && !off.size)
+    add('warn','You are paying for empty sheet','Only '+pct+'% of the length is used. Add more designs or hit "Fit sheet to art".');
+  if(!n) flags.innerHTML = '<p class="note" style="margin:0">Upload your PNGs, or load the sample designs to try the tool.</p>';
+
+  drawProps();
+}
+
+/* ---------------- selected-item panel ---------------- */
+
+function drawProps(){
+  const box = $('#props');
+  const it = state.items.find(x=>x.id===state.selId);
+  if(!it){ box.innerHTML = '<p class="empty">Nothing selected. Click a design on the sheet.</p>'; return; }
+  const dpi = effDpi(it);
+  box.innerHTML =
+    '<div class="row"><label>Width</label><div class="dual">'+
+      '<input type="number" id="pw" step="0.25" min="0.25" value="'+it.w.toFixed(2)+'"><span>in</span></div></div>'+
+    '<div class="row"><label>Height</label><div class="dual">'+
+      '<input type="number" id="ph" step="0.25" min="0.25" value="'+it.h.toFixed(2)+'"><span>in</span></div></div>'+
+    '<div class="row"><label>Rotation</label><div class="dual">'+
+      '<input type="number" id="pr" step="15" value="'+Math.round(it.rot)+'"><span>°</span></div></div>'+
+    '<div class="row"><label>Print quality</label><b style="color:'+(dpi<MIN_DPI?'var(--bad)':'var(--ok)')+'">'+dpi+' DPI</b></div>'+
+    '<div class="row" style="margin-top:12px;gap:6px">'+
+      '<button class="btn" id="dup1" style="flex:1">Duplicate</button>'+
+      '<button class="btn" id="dup3" style="flex:1">×4</button>'+
+      '<button class="btn" id="del" style="flex:1">Delete</button></div>'+
+    '<div class="row"><button class="link" id="r90">rotate 90°</button>'+
+      '<button class="link" id="center">center on sheet</button></div>';
+
+  const resize = (w,h)=>{ it.w=Math.max(0.25,w); it.h=Math.max(0.25,h); place(it); refresh(); };
+  $('#pw').oninput = e => { const v=+e.target.value; if(v>0) resize(v, v*(it.natH/it.natW)); };
+  $('#ph').oninput = e => { const v=+e.target.value; if(v>0) resize(v*(it.natW/it.natH), v); };
+  $('#pr').oninput = e => { it.rot = +e.target.value||0; place(it); refresh(); };
+  $('#dup1').onclick = ()=> duplicate(it.id,1);
+  $('#dup3').onclick = ()=> duplicate(it.id,3);
+  $('#del').onclick  = ()=> remove(it.id);
+  $('#r90').onclick  = ()=>{ it.rot=(it.rot+90)%360; place(it); refresh(); };
+  $('#center').onclick = ()=>{
+    it.x=(SHEET_W-it.w)/2; it.y=(state.tier.in-it.h)/2; place(it); refresh();
+  };
+}
+
+/* ---------------- pointer interaction ---------------- */
+
+let drag = null;
+
+sheetEl.addEventListener('pointerdown', e => {
+  const itemEl = e.target.closest('.item');
+  if(!itemEl){ select(null); return; }
+  const it = state.items.find(x=>x.id === +itemEl.dataset.id);
+  select(it.id);
+  const mode = e.target.dataset.h || 'move';
+  const r = sheetEl.getBoundingClientRect();
+  drag = {
+    it, mode,
+    sx:(e.clientX-r.left)/(SCALE*state.zoom), sy:(e.clientY-r.top)/(SCALE*state.zoom),
+    ox:it.x, oy:it.y, ow:it.w, oh:it.h, orot:it.rot,
+  };
+  sheetEl.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+
+sheetEl.addEventListener('pointermove', e => {
+  if(!drag) return;
+  const r = sheetEl.getBoundingClientRect();
+  const mx=(e.clientX-r.left)/(SCALE*state.zoom), my=(e.clientY-r.top)/(SCALE*state.zoom);
+  const dx=mx-drag.sx, dy=my-drag.sy, it=drag.it;
+
+  if(drag.mode==='move'){
+    it.x = drag.ox+dx; it.y = drag.oy+dy;
+    if(!e.shiftKey){                                   // snap to the safe margin
+      const b=aabb(it), snap=0.12;
+      if(Math.abs(b.x-MARGIN)<snap) it.x += MARGIN-b.x;
+      if(Math.abs(b.y-MARGIN)<snap) it.y += MARGIN-b.y;
+      const rEdge=SHEET_W-MARGIN, bEdge=state.tier.in-MARGIN;
+      if(Math.abs(b.x+b.w-rEdge)<snap) it.x += rEdge-(b.x+b.w);
+      if(Math.abs(b.y+b.h-bEdge)<snap) it.y += bEdge-(b.y+b.h);
+    }
+  } else if(drag.mode==='rot'){
+    const cx=it.x+it.w/2, cy=it.y+it.h/2;
+    let deg = Math.atan2(my-cy, mx-cx)*180/Math.PI + 90;
+    if(!e.shiftKey) deg = Math.round(deg/15)*15;
+    it.rot = ((deg%360)+360)%360;
+  } else {
+    // corner resize, aspect ratio locked to the source file
+    const ar = drag.ow/drag.oh;
+    const signX = drag.mode.includes('e') ? 1 : -1;
+    const signY = drag.mode.includes('s') ? 1 : -1;
+    let w = drag.ow + dx*signX;
+    let h = drag.oh + dy*signY;
+    w = Math.max(0.25, (w/ar + h)/2 * ar);             // average both axes, keep aspect
+    h = w/ar;
+    it.w=w; it.h=h;
+    if(signX<0) it.x = drag.ox + (drag.ow-w);
+    if(signY<0) it.y = drag.oy + (drag.oh-h);
+  }
+  place(it);
+});
+
+const endDrag = () => { if(drag){ drag=null; refresh(); } };
+sheetEl.addEventListener('pointerup', endDrag);
+sheetEl.addEventListener('pointercancel', endDrag);
+
+document.addEventListener('keydown', e => {
+  const it = state.items.find(x=>x.id===state.selId);
+  if(!it || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const step = e.shiftKey ? 1 : 0.0625;
+  const moves = {ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,-step],ArrowDown:[0,step]};
+  if(moves[e.key]){ it.x+=moves[e.key][0]; it.y+=moves[e.key][1]; place(it); refresh(); e.preventDefault(); }
+  if(e.key==='Delete'||e.key==='Backspace'){ remove(it.id); e.preventDefault(); }
+  if(e.key==='d'&&(e.metaKey||e.ctrlKey)){ duplicate(it.id,1); e.preventDefault(); }
+});
+
+/* ---------------- file input / drag & drop ---------------- */
+
+function loadFiles(files){
+  [...files].filter(f=>f.type.startsWith('image/')).forEach(f => {
+    const rd = new FileReader();
+    rd.onload = ev => {
+      const img = new Image();
+      img.onload = () => { addImage(ev.target.result, img.naturalWidth, img.naturalHeight); addThumb(ev.target.result); };
+      img.src = ev.target.result;
+    };
+    rd.readAsDataURL(f);
+  });
+}
+
+$('#btnUpload').onclick = ()=> $('#file').click();
+$('#file').onchange = e => { loadFiles(e.target.files); e.target.value=''; };
+
+['dragenter','dragover'].forEach(t => stageEl.addEventListener(t, e=>{
+  e.preventDefault(); $('#drop').classList.add('on');
+}));
+['dragleave','drop'].forEach(t => stageEl.addEventListener(t, e=>{
+  e.preventDefault();
+  if(t==='drop'){ loadFiles(e.dataTransfer.files); }
+  if(t==='dragleave' && e.relatedTarget && stageEl.contains(e.relatedTarget)) return;
+  $('#drop').classList.remove('on');
+}));
+
+/* ---------------- thumbnails ---------------- */
+
+const seenThumbs = new Set();
+function addThumb(src){
+  if(seenThumbs.has(src)) return;
+  seenThumbs.add(src);
+  const b=document.createElement('button');
+  b.className='thumb'; b.innerHTML='<img src="'+src+'" alt="">';
+  b.onclick = ()=>{
+    const img=new Image();
+    img.onload=()=>addImage(src,img.naturalWidth,img.naturalHeight);
+    img.src=src;
+  };
+  $('#thumbs').appendChild(b);
+}
+
+function loadSamples(seed){
+  SAMPLES.forEach(src => {
+    const img=new Image();
+    img.onload=()=>{ addImage(src,img.naturalWidth,img.naturalHeight); addThumb(src); };
+    img.onerror=()=>console.warn('missing sample',src);
+    img.src=src;
+  });
+  setTimeout(()=>{
+    // First visit: pad the sheet out a bit so the tool opens on a realistic order.
+    if(seed){
+      const extra = {'name-decal':3,'mama-bear':1,'pocket-badge':1,'game-day':1};
+      for(const [key,n] of Object.entries(extra)){
+        const it = state.items.find(i=>i.src.includes(key));
+        if(it) duplicate(it.id, n);
+      }
+    }
+    fitSheet(); select(null);
+  }, 400);
+}
+
+/* ---------------- export ---------------- */
+
+function proof(){
+  const c = document.createElement('canvas');
+  c.width  = Math.round(SHEET_W*PROOF_DPI);
+  c.height = Math.round(state.tier.in*PROOF_DPI);
+  const ctx = c.getContext('2d');
+  let pending = state.items.length;
+  if(!pending) return alert('Add some designs first.');
+  state.items.forEach(it => {
+    const img=new Image();
+    img.onload=()=>{
+      ctx.save();
+      ctx.translate((it.x+it.w/2)*PROOF_DPI, (it.y+it.h/2)*PROOF_DPI);
+      ctx.rotate(it.rot*Math.PI/180);
+      ctx.drawImage(img, -it.w/2*PROOF_DPI, -it.h/2*PROOF_DPI, it.w*PROOF_DPI, it.h*PROOF_DPI);
+      ctx.restore();
+      if(--pending===0){
+        const a=document.createElement('a');
+        a.download='gangsheet-22x'+state.tier.in+'-proof.png';
+        a.href=c.toDataURL('image/png'); a.click();
+      }
+    };
+    img.src=it.src;
+  });
+}
+
+function exportJson(){
+  const data = {
+    sheet:{widthIn:SHEET_W, lengthIn:state.tier.in, marginIn:MARGIN, price:state.tier.price},
+    designs: state.items.map(it=>({
+      file:it.src.startsWith('data:')?'(uploaded)':it.src,
+      xIn:+it.x.toFixed(3), yIn:+it.y.toFixed(3),
+      widthIn:+it.w.toFixed(3), heightIn:+it.h.toFixed(3),
+      rotationDeg:Math.round(it.rot), sourcePx:[it.natW,it.natH], effectiveDpi:effDpi(it),
+    })),
+  };
+  const a=document.createElement('a');
+  a.download='gangsheet-layout.json';
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.click();
+}
+
+/* ---------------- wiring ---------------- */
+
+const lenSel = $('#len');
+TIERS.forEach(t=>{
+  const o=document.createElement('option');
+  o.value=t.in; o.textContent='22" × '+t.in+'"  —  $'+t.price.toFixed(2);
+  lenSel.appendChild(o);
+});
+lenSel.value = state.tier.in;
+lenSel.onchange = e => setTier(e.target.value);
+
+$('#btnNest').onclick    = autoNest;
+$('#btnFit').onclick     = fitSheet;
+$('#btnSamples').onclick = ()=> loadSamples(false);
+$('#btnClear').onclick   = ()=>{
+  state.items.forEach(i=>i.el.remove()); state.items=[]; state.selId=null; refresh();
+};
+$('#btnZoomIn').onclick  = ()=>{ state.zoom=Math.min(2.5,state.zoom*1.25); layoutSheet(); };
+$('#btnZoomOut').onclick = ()=>{ state.zoom=Math.max(0.35,state.zoom/1.25); layoutSheet(); };
+$('#btnProof').onclick   = proof;
+$('#btnJson').onclick    = exportJson;
+$('#btnCart').onclick    = ()=>{
+  if(!state.items.length) return alert('Add some designs first.');
+  alert('Demo only — in the live store this posts the layout + proof to the cart as a '+
+        '22" × '+state.tier.in+'" gang sheet at $'+state.tier.price.toFixed(2)+
+        ', and the print-ready 300 DPI file is generated server-side for your production queue.');
+};
+
+window.addEventListener('resize', ()=>{ computeScale(); layoutSheet(); });
+
+computeScale();
+layoutSheet();
+refresh();
+loadSamples(true);
+</script>
+</body>
+</html>
