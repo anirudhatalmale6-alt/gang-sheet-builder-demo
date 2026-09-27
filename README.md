@@ -13,6 +13,9 @@ A browser-based DTF gang sheet builder: the customer uploads their artwork, arra
   (snaps to 15°, hold Shift for free rotation), arrow keys nudge, Shift+arrow nudges 1".
 - **Auto-nest** packs every design with a 0.125" gutter using shelf packing.
   **Fit sheet to art** nests and then drops to the smallest length tier that fits.
+- **Two materials** — DTF on a 22" roll and UV DTF on a 16" roll, each with its own price
+  table. Switching material repacks the layout for the new roll width instead of leaving a
+  pile of overlaps.
 - **Live pricing** by length tier (12" / 24" / 36" / 48" / 60" / 120"), with a usage meter
   showing how much of the sheet the customer is actually paying for.
 - **Pre-flight checks**, live, before they can order:
@@ -26,8 +29,8 @@ A browser-based DTF gang sheet builder: the customer uploads their artwork, arra
 - The proof renders at 100 DPI in-browser to keep memory sane. In production the print-ready
   300 DPI file (6600 px wide) is rendered server-side from the JSON layout when the order is
   placed — that keeps the customer's browser out of it entirely.
-- Length tiers and prices live in the `TIERS` array at the top of the script — a shop plugs
-  in their own numbers there.
+- Roll widths, length tiers and prices live in the `MATERIALS` object at the top of the
+  script — a shop plugs in their own numbers there. The ones shipped here are placeholders.
 - No build step, no dependencies. Open `index.html`.
 
 ## Files
